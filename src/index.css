@@ -1,0 +1,31 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/700.css";
+
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Portfolio host tokens — the lab UI may only rely on these + the default
+     palette + arbitrary values, so it lifts with zero changes. */
+  --color-ink: #0a0e14;
+  --color-surface: #121924;
+  --color-edge: #223047;
+  --color-accent: #5eead4;
+  --color-mute: #93a1b5;
+}
+
+body {
+  @apply bg-ink font-sans text-slate-200 antialiased;
+}
+
+/* Harness-only: the standalone page must give the lab a full-height
+   container (the portfolio shell provides this itself via flex-1). */
+html,
+body,
+#root {
+  height: 100%;
+}
