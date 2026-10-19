@@ -39,7 +39,7 @@ interface LaneProps {
   playing: boolean
   done: boolean
   metrics: AlgoMetrics | null
-  onCell: (x: number, y: number, phase: 'down' | 'move') => void
+  onCell: (x: number, y: number, phase: 'down' | 'move' | 'up') => void
 }
 
 export function Lane({ algo, grid, trace, progress, size, playing, done, metrics, onCell }: LaneProps) {
@@ -152,6 +152,15 @@ export function Lane({ algo, grid, trace, progress, size, playing, done, metrics
           const { x, y } = cellFromEvent(e)
           onCell(x, y, 'move')
         }}
+        onPointerUp={(e) => {
+          try {
+            e.currentTarget.releasePointerCapture(e.pointerId)
+          } catch {
+            /* pointer was never captured */
+          }
+          onCell(0, 0, 'up')
+        }}
+        onPointerCancel={() => onCell(0, 0, 'up')}
       />
     </section>
   )

@@ -199,14 +199,23 @@ export default function PathfindingLab() {
     [],
   )
 
+  const draggingRef = useRef(false)
+
   const onCell = useCallback(
-    (x: number, y: number, phase: 'down' | 'move') => {
+    (x: number, y: number, phase: 'down' | 'move' | 'up') => {
+      if (phase === 'up') {
+        draggingRef.current = false
+        return
+      }
       const i = y * grid.w + x
       if (phase === 'down') {
         if (i === grid.start) dragRef.current.mode = 'start'
         else if (i === grid.goal) dragRef.current.mode = 'goal'
         else dragRef.current.mode = paintMode
         dragRef.current.last = -1
+        draggingRef.current = true
+      } else if (!draggingRef.current) {
+        return // a move before any down (e.g. synthetic drags) is ignored
       }
       applyAt(i)
     },
@@ -261,37 +270,75 @@ export default function PathfindingLab() {
   }, [togglePlay, rerun, newMaze, bumpSpeed])
 
   // --- debug seam --------------------------------------------------------
+  // Read-backs must be correct in the *same task* as a seam mutation
+  // (typing-lab F4 class): a viewRef mirror is refreshed on every render,
+  // and each mutation patches it optimistically before calling setState, so
+  // a getState() immediately after paint/play/… never sees stale state.
+  const gridRef = useRef(grid)
+  gridRef.current = grid
+  const viewRef = useRef({
+    params,
+    grid,
+    progress,
+    playing,
+    maxNeeded,
+    traces: traces.map((t) => ({ algo: t.algo, steps: t.steps.length, found: t.found, path: t.path?.length ?? 0 })),
+  })
+  viewRef.current = {
+    params,
+    grid,
+    progress,
+    playing,
+    maxNeeded,
+    traces: traces.map((t) => ({ algo: t.algo, steps: t.steps.length, found: t.found, path: t.path?.length ?? 0 })),
+  }
+
   useEffect(() => {
     window.__PATHLAB__ = {
-      getState: () => ({
-        params,
-        grid: {
-          w: grid.w,
-          h: grid.h,
-          start: grid.start,
-          goal: grid.goal,
-          walls: Array.from(grid.walls),
-          weights: Array.from(grid.weights),
-        },
-        progress,
-        playing,
-        maxNeeded,
-        traces: traces.map((t) => ({ algo: t.algo, steps: t.steps.length, found: t.found, path: t.path?.length ?? 0 })),
-      }),
-      setProgress: (n: number) => setProgress(Math.max(0, Math.min(Math.round(n), maxNeeded))),
-      play: () => setPlaying(true),
-      pause: () => setPlaying(false),
-      rerun,
+      getState: () => {
+        const v = viewRef.current
+        const g = v.grid
+        return {
+          params: v.params,
+          grid: { w: g.w, h: g.h, start: g.start, goal: g.goal, walls: Array.from(g.walls), weights: Array.from(g.weights) },
+          progress: v.progress,
+          playing: v.playing,
+          maxNeeded: v.maxNeeded,
+          traces: v.traces,
+        }
+      },
+      setProgress: (n: number) => {
+        const c = Math.max(0, Math.min(Math.round(n), viewRef.current.maxNeeded))
+        viewRef.current = { ...viewRef.current, progress: c }
+        setProgress(c)
+      },
+      play: () => {
+        viewRef.current = { ...viewRef.current, playing: true }
+        setPlaying(true)
+      },
+      pause: () => {
+        viewRef.current = { ...viewRef.current, playing: false }
+        setPlaying(false)
+      },
+      rerun: () => {
+        viewRef.current = { ...viewRef.current, progress: 0, playing: true }
+        rerun()
+      },
       paint: (x: number, y: number) => {
-        dragRef.current.mode = 'wall'
-        dragRef.current.last = -1
-        applyAt(y * grid.w + x)
+        const c = cloneGrid(gridRef.current)
+        const i = y * c.w + x
+        if (i !== c.start && i !== c.goal) c.walls[i] ^= 1
+        gridRef.current = c
+        viewRef.current = { ...viewRef.current, grid: c, progress: 0, playing: false }
+        setGrid(c)
+        setProgress(0)
+        setPlaying(false)
       },
     }
     return () => {
       delete window.__PATHLAB__
     }
-  }, [params, grid, progress, playing, maxNeeded, traces, rerun, applyAt])
+  }, [rerun])
 
   const progressPct = Math.min(100, (progress / maxNeeded) * 100)
 
